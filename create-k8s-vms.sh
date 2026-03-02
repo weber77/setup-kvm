@@ -9,7 +9,6 @@ if [ -z "$VM_COUNT" ] || [ -z "$KVM_SETUP_SCRIPT" ]; then
   exit 1
 fi
 
-# Run KVM setup first
 echo "=== Running KVM setup script ==="
 bash "$KVM_SETUP_SCRIPT"
 
@@ -36,6 +35,14 @@ for i in $(seq 0 $((VM_COUNT-1))); do
   echo "---- Creating $VM_NAME ----"
 
   mkdir -p "$WORKDIR"
+
+  # -------------------------------------------------
+  # Generate UNIQUE MAC address (libvirt prefix)
+  # -------------------------------------------------
+  MAC_ADDRESS=$(printf '52:54:00:%02x:%02x:%02x\n' \
+    $((RANDOM%256)) $((RANDOM%256)) $((RANDOM%256)))
+
+  echo "Using MAC: $MAC_ADDRESS"
 
   cat > "$WORKDIR/user-data" <<EOF
 #cloud-config
@@ -72,15 +79,17 @@ EOF
     --disk path="$DISK",format=qcow2 \
     --disk path="$SEED",device=cdrom \
     --import \
-    --network network=default \
+    --network network=default,mac="$MAC_ADDRESS" \
     --graphics none \
     --osinfo ubuntu22.04 \
     --noautoconsole
 
   echo "$VM_NAME created"
+  echo
 
 done
 
 echo "=== All VMs created ==="
-echo "Get IPs:"
-echo "virsh net-dhcp-leases default"
+echo
+echo "Check IPs:"
+echo "  virsh net-dhcp-leases default"
