@@ -82,7 +82,7 @@ sudo chown libvirt-qemu:kvm "$VM_DISK" 2>/dev/null || true
 echo "Creating VM..."
 virt-install \
   --name "$VM_NAME" \
-  --memory 1024 \
+  --memory 2048 \
   --vcpus 1 \
   --disk path="$VM_DISK",format=qcow2 \
   --disk path="$SEED_ISO",device=cdrom \
