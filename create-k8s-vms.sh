@@ -1,101 +1,86 @@
 #!/usr/bin/env bash
 set -e
 
-if [ "$#" -lt 2 ]; then
-  echo "Usage: $0 <num_vms> <kvm_setup_script>"
+VM_COUNT="$1"
+KVM_SETUP_SCRIPT="$2"
+
+if [ -z "$VM_COUNT" ] || [ -z "$KVM_SETUP_SCRIPT" ]; then
+  echo "Usage: $0 <number_of_vms> <path_to_kvm_setup_script>"
   exit 1
 fi
 
-VM_COUNT=$1
-KVM_SETUP_SCRIPT=$2
-
-BASE_IMAGE="/var/lib/libvirt/images/jammy-server-cloudimg-amd64.img"
-IMAGE_DIR="/var/lib/libvirt/images"
-WORKDIR="$HOME/cloudinit-k8s"
-
-MEMORY=2048
-VCPUS=2
-DISK_SIZE=20G
-
-echo "== Running KVM setup script =="
+# Run KVM setup first
+echo "=== Running KVM setup script ==="
 bash "$KVM_SETUP_SCRIPT"
 
-echo "== Preparing workspace =="
-mkdir -p "$WORKDIR"
-cd "$WORKDIR"
+BASE_IMAGE="/var/lib/libvirt/images/jammy-server-cloudimg-amd64.img"
+IMAGE_URL="https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
 
+echo "=== Checking Ubuntu cloud image ==="
 if [ ! -f "$BASE_IMAGE" ]; then
-  echo "❌ Base image not found: $BASE_IMAGE"
-  exit 1
+  echo "Downloading Ubuntu cloud image..."
+  sudo wget -O "$BASE_IMAGE" "$IMAGE_URL"
 fi
 
-echo "== Creating $VM_COUNT VMs =="
+echo "=== Creating VMs ==="
 
-for ((i=0;i<VM_COUNT;i++)); do
+for i in $(seq 0 $((VM_COUNT-1))); do
+
   LETTER=$(printf "\\$(printf '%03o' $((97+i)))")
   VM_NAME="k8s-$LETTER"
 
+  DISK="/var/lib/libvirt/images/${VM_NAME}.qcow2"
+  SEED="/var/lib/libvirt/images/${VM_NAME}-seed.iso"
+  WORKDIR="/tmp/${VM_NAME}-cloudinit"
+
   echo "---- Creating $VM_NAME ----"
 
-  VM_DISK="$IMAGE_DIR/${VM_NAME}.qcow2"
-  SEED_ISO="$IMAGE_DIR/seed-${VM_NAME}.iso"
+  mkdir -p "$WORKDIR"
 
-  # disk clone
-  sudo qemu-img create -f qcow2 -b "$BASE_IMAGE" "$VM_DISK" "$DISK_SIZE"
-
-  # cloud-init files
-  cat <<EOF > user-data
+  cat > "$WORKDIR/user-data" <<EOF
 #cloud-config
 hostname: $VM_NAME
-manage_etc_hosts: true
-
 users:
   - name: ubuntu
-    sudo: ALL=(ALL) NOPASSWD:ALL
-    groups: users, admin
+    groups: sudo
     shell: /bin/bash
+    sudo: ALL=(ALL) NOPASSWD:ALL
     lock_passwd: false
-    passwd: \$6\$rounds=4096\$abc123\$wqjvKQyYkQ1k0QxHcZ1jZ3uZr9Jx8Q5yR5n0GvVJm8r9lA6G7JkJkF6T8F8l9PzJYkZ8vJ1cQGZ5n7H0Jg0k1/
-
+    passwd: \$6\$rounds=4096\$example\$examplehashedpassword
 ssh_pwauth: true
-disable_root: false
-
 package_update: true
 packages:
   - qemu-guest-agent
-
 runcmd:
-  - systemctl enable qemu-guest-agent
-  - systemctl start qemu-guest-agent
+  - systemctl enable --now qemu-guest-agent
 EOF
 
-  cat <<EOF > meta-data
+  cat > "$WORKDIR/meta-data" <<EOF
 instance-id: $VM_NAME
 local-hostname: $VM_NAME
 EOF
 
-  cloud-localds "seed-${VM_NAME}.iso" user-data meta-data
-  sudo mv "seed-${VM_NAME}.iso" "$SEED_ISO"
+  cloud-localds "$WORKDIR/seed.iso" "$WORKDIR/user-data" "$WORKDIR/meta-data"
+  sudo mv "$WORKDIR/seed.iso" "$SEED"
+
+  sudo qemu-img create -f qcow2 -b "$BASE_IMAGE" "$DISK"
 
   virt-install \
     --name "$VM_NAME" \
-    --memory $MEMORY \
-    --vcpus $VCPUS \
-    --disk path="$VM_DISK",format=qcow2 \
-    --disk path="$SEED_ISO",device=cdrom \
+    --memory 2048 \
+    --vcpus 2 \
+    --disk path="$DISK",format=qcow2 \
+    --disk path="$SEED",device=cdrom \
     --import \
     --network network=default \
     --graphics none \
     --osinfo ubuntu22.04 \
     --noautoconsole
 
+  echo "$VM_NAME created"
+
 done
 
-echo
-echo "✅ All VMs created"
-echo
-echo "Check IPs:"
-echo "  virsh net-dhcp-leases default"
-echo
-echo "SSH:"
-echo "  ssh ubuntu@<vm-ip>"
+echo "=== All VMs created ==="
+echo "Get IPs:"
+echo "virsh net-dhcp-leases default"
