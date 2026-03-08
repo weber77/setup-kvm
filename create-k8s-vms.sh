@@ -154,8 +154,9 @@ EOF
   # ------------------------------------------------
   # Create VM disk
   # ------------------------------------------------
-  sudo qemu-img create -f qcow2 -b "$BASE_IMAGE" "$DISK"
-
+  sudo qemu-img create -f qcow2 -F qcow2 -b "$BASE_IMAGE" "$DISK"
+  sudo qemu-img resize "$DISK" 20G 
+  
   # ------------------------------------------------
   # Create VM
   # ------------------------------------------------
