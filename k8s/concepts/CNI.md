@@ -25,46 +25,48 @@ The Container Network Interface (CNI) is a standard that defines how the Kuberne
 
 Do these from a node that runs the pod (or from the control plane if you use kubectl from there).
 
-1. **List nodes and get pod placement**  
-   - `kubectl get nodes -o wide`  
+1. **List nodes and get pod placement**
+   - `kubectl get nodes -o wide`
    - `kubectl get pods -o wide`  
-   Note which node the pod is on.
+     Note which node the pod is on.
 
-2. **On that node: list veth interfaces**  
+2. **On that node: list veth interfaces**
    - `ip link show | grep -A 1 "veth"`  
-   You should see veth pairs; one end is in the host, the other in the pod’s network namespace.
+     You should see veth pairs; one end is in the host, the other in the pod’s network namespace.
 
-3. **List network namespaces**  
+3. **List network namespaces**
    - `ip netns list`  
-   Or: `ls /var/run/netns`  
-   Pod namespaces are often named like `cni-<id>` or similar (depends on runtime/CNI).
+     Or: `ls /var/run/netns`  
+     Pod namespaces are often named like `cni-<id>` or similar (depends on runtime/CNI).
 
-4. **Inspect the pod’s network namespace**  
-   - Find the namespace for your pod (from step 3 or from the CNI/containerd metadata).  
-   - `ip netns exec <pod-namespace> ip addr show`  
+4. **Inspect the pod’s network namespace**
+   - Find the namespace for your pod (from step 3 or from the CNI/containerd metadata).
+   - `ip netns exec <pod-namespace> ip addr show`
    - `ip netns exec <pod-namespace> ip route show`  
-   This shows the IP and routes inside the pod.
+     This shows the IP and routes inside the pod.
 
-5. **Inspect from inside the pod**  
-   - `kubectl exec -it <pod-name> -- sh`  
+5. **Inspect from inside the pod**
+   - `kubectl exec -it <pod-name> -- sh`
    - Inside: `ip addr` (or `ip a`), `ip route`, `cat /etc/resolv.conf`  
-   This should match what you saw in the pod’s network namespace on the host.
+     This should match what you saw in the pod’s network namespace on the host.
 
-6. **Check CNI config and binaries**  
-   - `ls /etc/cni/net.d/`  
-   - `ls /opt/cni/bin/`  
+6. **Check CNI config and binaries**
+   - `ls /etc/cni/net.d/`
+   - `ls /opt/cni/bin/`
    - `cat /etc/cni/net.d/<config>`  
-   Confirm the plugin and IPAM settings.
+     Confirm the plugin and IPAM settings.
 
 ## Useful commands (summary)
 
 From control plane / any machine with kubectl:
+
 - `kubectl get nodes -o wide`
 - `kubectl get pods -o wide`
 - `kubectl exec -it <pod-name> -- ip a`
 - `kubectl exec -it <pod-name> -- ip route`
 
 On the node (where the pod runs):
+
 - `ip link show | grep -A 1 "veth"`
 - `ip netns list`
 - `ip netns exec <pod-namespace> ip addr show`
