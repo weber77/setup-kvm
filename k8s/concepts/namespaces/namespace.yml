@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: my-namespace
+---
+# kubectl create namespace my-namespace --dry-run=client -o yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: my-namespace
+spec: {}
+status: {}
+# service in different namespace communicate using Full Qualified Domain Name (FQDN)
+# <service-name>.<namespace>.svc.cluster.local
+# example: nginx-service.my-namespace.svc.cluster.local

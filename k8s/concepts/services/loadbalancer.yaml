@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: lb-svc
+  labels:
+    env: demo
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+  selector:
+    env: demo
+---
+# kubectl create service loadbalancer lb-svc --tcp=80:8080 --dry-run=client -o yaml
+apiVersion: v1
+kind: Service
+metadata:
+  creationTimestamp: null
+  labels:
+    app: lb-svc
+  name: lb-svc
+spec:
+  ports:
+    - name: 80-8080
+      port: 80
+      protocol: TCP
+      targetPort: 8080
+  selector:
+    app: lb-svc
+  type: LoadBalancer
+status:
+  loadBalancer: {}

@@ -66,6 +66,78 @@ Each VM is created with **20 GB disk** and **2 GB RAM** — recommended for runn
 
 ---
 
+## Bootstrap control plane and worker nodes
+
+After VMs are created (for example `k8s-a` and `k8s-b`), use two terminals:
+
+### 1. Configure control plane (`k8s-a`)
+
+On your host:
+
+```bash
+virsh console k8s-a
+```
+
+Inside `k8s-a`, run:
+
+```bash
+cd /path/to/Self-Hosted-Kubernetes-/k8s/setup
+chmod +x control-plane-node.sh
+./control-plane-node.sh
+```
+
+At the end, copy the `kubeadm join ...` command shown by the control-plane setup.
+
+### 2. Configure worker (`k8s-b`) in another terminal
+
+On your host (second terminal):
+
+```bash
+virsh console k8s-b
+```
+
+Inside `k8s-b`, create and run the worker setup script:
+
+```bash
+cd /path/to/Self-Hosted-Kubernetes-/k8s/setup
+chmod +x worker-node.sh
+./worker-node.sh
+```
+
+Then paste and run the join command copied from `k8s-a`:
+
+```bash
+sudo kubeadm join <control-plane-ip>:6443 --token <token> --discovery-token-ca-cert-hash sha256:<hash>
+```
+
+### 3. Verify nodes from control plane
+
+Back on `k8s-a`, check cluster nodes:
+
+```bash
+kubectl get nodes
+```
+
+You should see both control-plane and worker nodes in `Ready` state.
+
+---
+
+## Roadmap: scripts to guided setup
+
+The project is currently script-first. Public roadmap updates are shared one phase at a time.
+
+### Phase 1 (near term): stabilize and standardize script workflows
+
+Progress checklist:
+
+- [x] Script-first automation baseline exists (`install-kvm.sh`, VM creation scripts, reset utilities).
+- [ ] Consolidate VM and Kubernetes setup flags into one documented config file (defaults + overrides).
+- [ ] Add stronger preflight checks (CPU virtualization, disk space, libvirt status, network bridge availability).
+- [ ] Improve error messages and recovery steps so failures are actionable.
+- [ ] Add non-interactive mode support for repeatable local automation and CI-style validation.
+
+---
+
 ## Requirements
 
 - Ubuntu host (recommended)

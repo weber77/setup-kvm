@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: manual-scheduled-pod
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+  nodeName: k8s-a # this is the node name where the pod will be scheduled

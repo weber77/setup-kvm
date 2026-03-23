@@ -1,0 +1,21 @@
+# A job is a Kubernetes resource that creates pod(s) to perform a task to completion.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: data-processor-job
+spec:
+  template:
+    spec:
+      containers:
+        - name: processor
+          image: python:3.10-slim
+          command:
+            - python
+            - -c
+            - |
+              import time
+              print('processing data...')
+              time.sleep(10)
+              print('data processed')
+      restartPolicy: Never
+  backoffLimit: 2

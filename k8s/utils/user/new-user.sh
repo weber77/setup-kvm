@@ -162,7 +162,6 @@ BASE64_DECODE_FLAG="--decode"
 if [[ "$(uname -s)" == "Darwin" ]]; then 
   BASE64_DECODE_FLAG="-D"
 fi
-
 kubectl get csr "${USERNAME}" -o jsonpath='{.status.certificate}' | base64 "${BASE64_DECODE_FLAG}" > "${CRT_FILE}"
 
 cat > "${RBAC_YAML}" <<EOF
@@ -192,7 +191,7 @@ roleRef:
 EOF
 
 kubectl apply -f "${RBAC_YAML}"
-kubectl config set-credentials ${USERNAME} --client-certificate=${CRT_FILE} --client-key=${KEY_FILE}
+kubectl config set-credentials ${USERNAME} --client-certificate=${CRT_FILE} --client-key=${KEY_FILE} --embed-certs=true
 kubectl config set-context ${USERNAME}-context --cluster=kubernetes --namespace=${NAMESPACE} --user=${USERNAME} 
 
 echo "Created user cert and RBAC in ${OUT_DIR}/"

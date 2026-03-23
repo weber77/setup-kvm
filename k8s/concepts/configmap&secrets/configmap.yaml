@@ -1,0 +1,24 @@
+# kubectl create cm app-cm --from-literal=firstname=womba --dry-run=client -o yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-cm
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app-pod
+  labels:
+    app.kubernetes.io/name: app-pod
+spec:
+  containers:
+    - name: app-container
+      image: busybox:1.28
+      env:
+        - name: FIRSTNAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-cm
+              key: firstname
+      command: ["sh", "-c", "echo $FIRSTNAME is running! && sleep 3600"]

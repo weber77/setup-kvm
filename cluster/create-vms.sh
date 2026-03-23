@@ -19,6 +19,7 @@ EOF
 PREFIX="k8s"
 VM_COUNT=""
 
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -p|--prefix)
@@ -65,7 +66,8 @@ if ! [[ "$VM_COUNT" =~ ^[0-9]+$ ]] || [[ "$VM_COUNT" -le 0 ]]; then
   exit 1
 fi
 
-BASE_IMAGE="${BASE_IMAGE_OVERRIDE:-/var/lib/libvirt/images/jammy-server-cloudimg-amd64.img}"
+# BASE_IMAGE="${BASE_IMAGE_OVERRIDE:-/var/lib/libvirt/images/jammy-server-cloudimg-amd64.img}"
+BASE_IMAGE="${BASE_IMAGE_OVERRIDE:-/var/lib/libvirt/images/k8s-base.qcow2}"
 IMAGE_URL="https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img"
 IMAGE_DIR="/var/lib/libvirt/images"
 

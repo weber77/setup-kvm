@@ -1,0 +1,19 @@
+# creates one or more scheduled jobs based on a cron syntax.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: print-40daysofk8s
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: printer
+              image: busybox
+              command:
+                - /bin/sh
+                - -c
+                - "echo '#40daysofk8s'"
+          restartPolicy: OnFailure

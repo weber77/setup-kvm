@@ -1,0 +1,37 @@
+# kubectl taint nodes k8s-a gpu=true:NoSchedule
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: redis
+  name: redis
+spec:
+  containers:
+    - image: redis
+      name: redis
+  tolerations:
+    - key: "gpu"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
+
+---
+# if we want to force to run a pod say k8s-a
+# label the node: kubectl label node k8s-a gpu=true
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    run: redis
+  name: redis
+spec:
+  nodeSelector:
+    gpu: true
+  containers:
+    - image: redis
+      name: redis
+  tolerations:
+    - key: "gpu"
+      operator: "Equal"
+      value: "true"
+      effect: "NoSchedule"
