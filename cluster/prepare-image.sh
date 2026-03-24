@@ -6,72 +6,85 @@ VM_NAME="tmp-a"
 SSH_PASS="ubuntu"
 SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=5"
 
-echo "======================================"
-echo "Creating temporary VM..."
-echo "======================================"
-
+echo "=== Creating temp VM ==="
 ./create-vms.sh --prefix tmp 1
 
-echo "Waiting for VM MAC address..."
+echo "=== Getting IP ==="
 
-# Get the MAC from virsh
 VM_MAC=$(virsh dumpxml "$VM_NAME" | awk -F\' '/mac address/ {print $2}')
 VM_IP=""
 
-echo "Waiting for VM IP..."
 while [ -z "$VM_IP" ]; do
   VM_IP=$(virsh net-dhcp-leases default \
     | grep -i "$VM_MAC" \
-    | awk '{for(i=1;i<=NF;i++) if($i ~ /\//) print $i}' \
-    | cut -d/ -f1)
-  
-  if [ -z "$VM_IP" ]; then
-    echo "  IP not yet assigned for $VM_MAC, retrying..."
-    sleep 2
-  fi
+    | awk '{print $5}' | cut -d/ -f1)
+  sleep 2
 done
 
 echo "VM IP: $VM_IP"
 
-echo "Waiting for SSH..."
+echo "=== Waiting for SSH ==="
 until sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$VM_IP "echo ok" 2>/dev/null; do
   sleep 3
 done
 
-echo "Waiting for cloud-init..."
-MAX_WAIT=300
-WAITED=0
-until sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$VM_IP "cloud-init status 2>/dev/null | grep -q done"; do
-  sleep 5
-  WAITED=$((WAITED+5))
-  if [ "$WAITED" -ge "$MAX_WAIT" ]; then
-    echo "Timeout waiting for cloud-init"
-    exit 1
-  fi
-done
+echo "=== Waiting for cloud-init ==="
+sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$VM_IP "cloud-init status --wait"
 
-echo "Running Kubernetes setup..."
+echo "=== Installing Kubernetes base ==="
 sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$VM_IP 'bash -s' < worker-node.sh
 
-echo "Shutting down VM..."
-sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$VM_IP "sudo shutdown now" || true
+echo "=== Cleaning system for image ==="
 
-echo "Waiting for VM to shut down..."
+sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$VM_IP <<'EOF'
+set -e
 
+# Stop services cleanly
+sudo systemctl stop kubelet || true
+
+# Clean cloud-init
+sudo cloud-init clean
+
+# Remove machine-id (CRITICAL)
+sudo truncate -s 0 /etc/machine-id
+
+# Remove SSH host keys (regen on boot)
+sudo rm -f /etc/ssh/ssh_host_*
+
+# Clean logs
+sudo rm -rf /var/log/*
+
+# Clean apt
+sudo apt-get clean
+
+sync
+EOF
+
+echo "=== Shutdown VM ==="
+sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$VM_IP "sudo systemctl poweroff" || true
+
+# Wait for VM to actually shut down (with timeout)
+TIMEOUT=60
+ELAPSED=0
 while true; do
   STATE=$(virsh domstate "$VM_NAME" 2>/dev/null || echo "shut off")
-
-  if [[ "$STATE" == "shut off" ]]; then
+  [[ "$STATE" == "shut off" ]] && break
+  sleep 3
+  ELAPSED=$((ELAPSED+3))
+  if [ "$ELAPSED" -ge "$TIMEOUT" ]; then
+    echo "VM did not shut down in $TIMEOUT seconds. Forcing via virsh destroy..."
+    virsh destroy "$VM_NAME"
     break
   fi
-
-  echo "  still running..."
-  sleep 3
 done
 
-echo "VM is fully stopped ✅"
-
-echo "Cleaning up temporary VM..."
-sudo virsh undefine "$VM_NAME"
+echo "=== Convert to base image ==="
+sudo qemu-img convert -f qcow2 -O qcow2 "/var/lib/libvirt/images/${VM_NAME}.qcow2" "${TARGET_IMAGE}.tmp"
 sudo rm -f "/var/lib/libvirt/images/${VM_NAME}.qcow2"
+sudo mv "${TARGET_IMAGE}.tmp" "$TARGET_IMAGE"
+
+echo "=== Cleanup ==="
+sudo virsh undefine "$VM_NAME"
 sudo rm -f "/var/lib/libvirt/images/${VM_NAME}-seed.iso"
+
+echo "✅ Base image ready: $TARGET_IMAGE"

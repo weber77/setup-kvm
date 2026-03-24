@@ -166,6 +166,9 @@ echo "Initializing control plane..."
 sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$CONTROL_IP 'bash -s' <<'EOF'
 cloud-init status --wait
 
+sudo systemctl restart containerd
+sudo systemctl restart kubelet
+
 sudo kubeadm init \
   --pod-network-cidr=10.244.0.0/16 \
   --kubernetes-version=v1.33.0 \
