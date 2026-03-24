@@ -154,6 +154,8 @@ else
   WORKER_IPS=("${IPS[@]}")
 fi
 
+ensure_sshpass
+
 if [ "$CONTROL_PLANE" = true ]; then
   echo "Waiting for SSH on control plane..."
 
@@ -192,12 +194,12 @@ fi
 for ip in "${WORKER_IPS[@]}"; do
   echo "Waiting for SSH on worker $ip..."
 
-  until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@$ip "echo ok" 2>/dev/null; do
+  until sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$ip "echo ok" 2>/dev/null; do
     sleep 3
   done
 
   echo "Joining worker $ip"
-  ssh -o StrictHostKeyChecking=no ubuntu@$ip "cloud-init status --wait && sudo $JOIN_CMD"
+  sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$ip "cloud-init status --wait && sudo $JOIN_CMD"
 done
 
 echo "Cluster ready 🚀"
