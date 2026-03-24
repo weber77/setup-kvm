@@ -101,10 +101,10 @@ sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config
 export KUBECONFIG=$HOME/.kube/config
 
-echo "Step 5: Apply Flannel Network"
+echo "Step 5: Apply Calico Network"
+# Apply Calico CNI
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
 
-# Apply Flannel CNI
-kubectl apply -f https://github.com/coreos/flannel/raw/master/Documentation/kube-flannel.yml
 
 # Remove control-plane taint so pods can be scheduled
 kubectl taint nodes $(hostname) node-role.kubernetes.io/control-plane:NoSchedule-
