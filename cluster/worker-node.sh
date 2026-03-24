@@ -3,6 +3,17 @@
 
 #!/bin/bash
 set -e
+echo "Waiting for apt lock..."
+
+while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+  sleep 2
+done
+
+while sudo fuser /var/lib/apt/lists/lock >/dev/null 2>&1; do
+  sleep 2
+done
+
+echo "apt lock released"
 
 echo "Step 1: Install kubectl, kubeadm, and kubelet v1.33.0"
 

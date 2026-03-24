@@ -10,6 +10,52 @@ print_manual() {
   echo "  ./cluster.sh --base-image <path>"
 }
 
+ensure_sshpass() {
+  if command -v sshpass >/dev/null 2>&1; then
+    return 0
+  fi
+  echo "sshpass not found; installing..."
+  case "$(uname -s)" in
+    Darwin)
+      if ! command -v brew >/dev/null 2>&1; then
+        echo "Homebrew is required to install sshpass on macOS." >&2
+        exit 1
+      fi
+      if ! brew install hudochenkov/sshpass/sshpass 2>/dev/null; then
+        brew tap esolitos/ipa >/dev/null 2>&1 || true
+        brew install esolitos/ipa/sshpass || {
+          echo "Could not install sshpass via Homebrew." >&2
+          exit 1
+        }
+      fi
+      ;;
+    Linux)
+      if [ -f /etc/debian_version ]; then
+        sudo apt-get update -qq && sudo apt-get install -y sshpass
+      elif command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y sshpass
+      elif command -v yum >/dev/null 2>&1; then
+        sudo yum install -y sshpass
+      elif command -v pacman >/dev/null 2>&1; then
+        sudo pacman -S --noconfirm sshpass
+      else
+        echo "Could not detect package manager; install sshpass manually." >&2
+        exit 1
+      fi
+      ;;
+    *)
+      echo "Unsupported OS; install sshpass manually." >&2
+      exit 1
+      ;;
+  esac
+  command -v sshpass >/dev/null 2>&1 || {
+    echo "sshpass install failed." >&2
+    exit 1
+  }
+}
+SSH_PASS="ubuntu"
+SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=5"
+
 BASE_IMAGE="/var/lib/libvirt/images/k8s-base.qcow2"
 WORKERS=0
 WORKER_ONLY=false
@@ -35,6 +81,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --prepare-image)
+      ensure_sshpass
       ./prepare-image.sh
       exit 0
       ;;
@@ -51,6 +98,7 @@ done
 
 if [ ! -f "$BASE_IMAGE" ]; then
   echo "Base image not found. Preparing..."
+  ensure_sshpass
   ./prepare-image.sh --output "$BASE_IMAGE"
 else
   echo "Using existing base image: $BASE_IMAGE"
@@ -69,17 +117,31 @@ sleep 10
 
 IPS=()
 
+echo "Waiting for VMs to get IPs..."
+
+IPS=()
+
 for vm in $(virsh list --name | grep k8s); do
-  ip=$(virsh net-dhcp-leases default \
-    | awk -v name="$vm" '$6 == name {print $5}' \
-    | cut -d/ -f1)
+  echo "Resolving IP for $vm..."
 
-  if [ -z "$ip" ]; then
-    echo "Failed to get IP for $vm"
-    exit 1
-  fi
+  VM_IP=""
 
-  IPS+=("$ip")
+  while [ -z "$VM_IP" ]; do
+    VM_MAC=$(virsh dumpxml "$vm" | awk -F\' '/mac address/ {print $2}')
+
+    VM_IP=$(virsh net-dhcp-leases default \
+      | grep -i "$VM_MAC" \
+      | awk '{for(i=1;i<=NF;i++) if($i ~ /\//) print $i}' \
+      | cut -d/ -f1)
+
+    if [ -z "$VM_IP" ]; then
+      echo "  waiting for DHCP..."
+      sleep 2
+    fi
+  done
+
+  echo "$vm IP: $VM_IP"
+  IPS+=("$VM_IP")
 done
 
 CONTROL_IP=""
@@ -95,13 +157,13 @@ fi
 if [ "$CONTROL_PLANE" = true ]; then
   echo "Waiting for SSH on control plane..."
 
-  until ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ubuntu@$CONTROL_IP "echo ok" 2>/dev/null; do
-    sleep 3
-  done
+until sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$CONTROL_IP "echo ok" 2>/dev/null; do
+  sleep 3
+done
 
-  echo "Initializing control plane..."
+echo "Initializing control plane..."
 
-  ssh -o StrictHostKeyChecking=no ubuntu@$CONTROL_IP 'bash -s' <<'EOF'
+sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$CONTROL_IP 'bash -s' <<'EOF'
 cloud-init status --wait
 
 sudo kubeadm init \
@@ -121,7 +183,7 @@ kubectl taint nodes $(hostname) node-role.kubernetes.io/control-plane:NoSchedule
 kubeadm token create --print-join-command > /tmp/join.sh
 EOF
 
-  JOIN_CMD=$(ssh -o StrictHostKeyChecking=no ubuntu@$CONTROL_IP "cat /tmp/join.sh")
+JOIN_CMD=$(sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$CONTROL_IP "cat /tmp/join.sh")
 fi
 
 for ip in "${WORKER_IPS[@]}"; do

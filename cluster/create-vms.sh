@@ -294,6 +294,11 @@ EOF
   # ------------------------------------------------
   sudo qemu-img create -f qcow2 -F qcow2 -b "$BASE_IMAGE" "$DISK"
   sudo qemu-img resize "$DISK" ${DISK_PER_VM_GB}G 
+  sudo chown -R libvirt-qemu:libvirt-qemu /var/lib/libvirt/images
+  # fix dirs
+  sudo find /var/lib/libvirt/images -type d -exec chmod 755 {} \;
+  # fix files
+  sudo find /var/lib/libvirt/images -type f -exec chmod 644 {} \;
   
   # ------------------------------------------------
   # Create VM
