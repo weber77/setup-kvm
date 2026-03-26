@@ -10,10 +10,9 @@ Usage:
 
 Options:
   -p, --prefix <name>   VM name prefix (default: k8s)
-  --base-image <path>   Base image path when using --remove-base (default:
+  --base-image <path>   Base image path to delete/keep (default:
                         /var/lib/libvirt/images/k8s-base.qcow2)
-  --remove-base         Also delete the golden base qcow2 (recreate with
-                        ./cluster.sh --prepare-image or prepare-image.sh)
+  --keep-base           Do NOT delete the golden base qcow2
   --include-tmp         Also destroy leftover tmp-* domains from prepare-image
   -y, --yes             Do not prompt for confirmation
   -h, --help            Show this help
@@ -21,14 +20,14 @@ Options:
 Examples:
   sudo ./purge-cluster.sh
   sudo ./purge-cluster.sh -p dev -y
-  sudo ./purge-cluster.sh --remove-base -y
+  sudo ./purge-cluster.sh --keep-base -y
 EOF
 }
 
 PREFIX="k8s"
 IMAGE_DIR="/var/lib/libvirt/images"
 BASE_IMAGE="${IMAGE_DIR}/k8s-base.qcow2"
-REMOVE_BASE=false
+REMOVE_BASE=true
 INCLUDE_TMP=false
 YES=false
 
@@ -50,8 +49,8 @@ while [[ $# -gt 0 ]]; do
       BASE_IMAGE="$2"
       shift 2
       ;;
-    --remove-base)
-      REMOVE_BASE=true
+    --keep-base)
+      REMOVE_BASE=false
       shift
       ;;
     --include-tmp)
@@ -89,7 +88,7 @@ collect_domains() {
   local name
   while IFS= read -r name; do
     [[ -z "$name" ]] && continue
-    if [[ "$name" == "$PREFIX"-[a-z] ]]; then
+    if [[ "$name" == "$PREFIX"-cp-[a-z] ]] || [[ "$name" == "$PREFIX"-w-[a-z] ]]; then
       names+=("$name")
     fi
   done < <(virsh list --all --name 2>/dev/null || true)
@@ -126,6 +125,8 @@ else
 fi
 if [[ "$REMOVE_BASE" == true ]]; then
   echo "Will remove base image: $BASE_IMAGE"
+else
+  echo "Will keep base image: $BASE_IMAGE"
 fi
 echo "======================================"
 

@@ -32,7 +32,7 @@ echo "=== Waiting for cloud-init ==="
 sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$VM_IP "cloud-init status --wait"
 
 echo "=== Installing Kubernetes base ==="
-sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$VM_IP 'bash -s' < worker-node.sh
+sshpass -p "$SSH_PASS" ssh $SSH_OPTS ubuntu@$VM_IP 'bash -s' < k8s-node.sh
 
 echo "=== Cleaning system for image ==="
 

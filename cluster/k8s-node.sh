@@ -87,4 +87,4 @@ sudo kubeadm config images pull \
   --cri-socket unix:///run/containerd/containerd.sock \
   --kubernetes-version v1.33.0
 
-echo "✅ Node ready for kubeadm"
+echo "✅ K8s Node ready"
