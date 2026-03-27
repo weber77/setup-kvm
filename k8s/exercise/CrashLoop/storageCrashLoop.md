@@ -117,7 +117,7 @@ kubectl get pods -w
 
 After a few restarts you should see `CrashLoopBackOff` for `storage-crashloop-demo`.
 
-## 4) Prove *why* it’s crashlooping
+## 4) Prove _why_ it’s crashlooping
 
 Describe the Pod and look at Events (near the bottom). You should see restarts and non-zero exit codes.
 
@@ -145,4 +145,3 @@ If you want to also remove the directory on the node (optional), SSH to the node
 ```bash
 sudo rm -rf /home/ubuntu/storage-demo
 ```
-
