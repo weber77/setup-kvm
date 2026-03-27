@@ -8,21 +8,15 @@ Usage:
 
 Options:
   -p, --prefix <prefix>   VM name prefix (default: k8s)
-  -r, --role <role>       Insert role into name (k8s-<role>-a). Example roles: cp, w
-  -s, --suffix <suffix>   Append suffix to VM name (legacy; default: none)
   -h, --help              Show this help
 
 Examples:
   create-vms.sh 3
   create-vms.sh --prefix dev 2
-  create-vms.sh --prefix k8s --role cp 2   # k8s-cp-a, k8s-cp-b
-  create-vms.sh --prefix k8s --role w  2   # k8s-w-a,  k8s-w-b
 EOF
 }
 
 PREFIX="k8s"
-ROLE=""
-SUFFIX=""
 VM_COUNT=""
 
 
@@ -35,24 +29,6 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       PREFIX="$2"
-      shift 2
-      ;;
-    -r|--role)
-      if [[ -z "${2:-}" ]]; then
-        echo "Error: --role requires a value" >&2
-        usage
-        exit 1
-      fi
-      ROLE="$2"
-      shift 2
-      ;;
-    -s|--suffix)
-      if [[ -z "${2:-}" ]]; then
-        echo "Error: --suffix requires a value" >&2
-        usage
-        exit 1
-      fi
-      SUFFIX="$2"
       shift 2
       ;;
     -h|--help)
@@ -106,12 +82,6 @@ echo "======================================"
 echo "Kubernetes VM Provisioner"
 echo "VMs requested: $VM_COUNT"
 echo "VM name prefix: $PREFIX"
-if [[ -n "$ROLE" ]]; then
-  echo "VM name role: $ROLE"
-else
-  echo "VM name role: <none>"
-fi
-echo "VM name suffix: ${SUFFIX:-<none>}"
 echo "Base image: $BASE_IMAGE"
 echo "======================================"
 
@@ -197,20 +167,8 @@ echo "======================================"
 START_INDEX=0
 while IFS= read -r existing_name; do
   [[ -z "$existing_name" ]] && continue
-  if [[ -n "$ROLE" ]]; then
-    if [[ "$existing_name" == "${PREFIX}-${ROLE}-"[a-z]${SUFFIX} ]]; then
-      suffix="${existing_name#"$PREFIX"-"$ROLE"-}"
-      suffix="${suffix%$SUFFIX}"
-    else
-      continue
-    fi
-  else
-    if [[ "$existing_name" == "${PREFIX}"-[a-z]${SUFFIX} ]]; then
-      suffix="${existing_name#"$PREFIX"-}"
-      suffix="${suffix%$SUFFIX}"
-    else
-      continue
-    fi
+  if [[ "$existing_name" == "$PREFIX"-[a-z] ]]; then
+    suffix="${existing_name#"$PREFIX"-}"
     ord=$(printf '%d' "'$suffix")
     idx=$((ord - 97))
     if [[ "$idx" -ge "$START_INDEX" ]]; then
@@ -270,11 +228,7 @@ echo
 for i in $(seq "$START_INDEX" $((START_INDEX + VM_COUNT - 1))); do
 
   LETTER=$(printf "\\$(printf '%03o' $((97+i)))")
-  if [[ -n "$ROLE" ]]; then
-    VM_NAME="${PREFIX}-${ROLE}-${LETTER}${SUFFIX}"
-  else
-    VM_NAME="${PREFIX}-${LETTER}${SUFFIX}"
-  fi
+  VM_NAME="${PREFIX}-${LETTER}"
 
   DISK="/var/lib/libvirt/images/${VM_NAME}.qcow2"
   SEED="/var/lib/libvirt/images/${VM_NAME}-seed.iso"
@@ -340,11 +294,6 @@ EOF
   # ------------------------------------------------
   sudo qemu-img create -f qcow2 -F qcow2 -b "$BASE_IMAGE" "$DISK"
   sudo qemu-img resize "$DISK" ${DISK_PER_VM_GB}G 
-  sudo chown -R libvirt-qemu:libvirt-qemu /var/lib/libvirt/images
-  # fix dirs
-  sudo find /var/lib/libvirt/images -type d -exec chmod 755 {} \;
-  # fix files
-  sudo find /var/lib/libvirt/images -type f -exec chmod 644 {} \;
   
   # ------------------------------------------------
   # Create VM

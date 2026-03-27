@@ -20,7 +20,7 @@ chmod +x install-kvm.sh
 
 cd k8s-homelab/cluster
 chmod +x *
-./cluster.sh --control-planes 1 --workers 2  # same as: ./cluster.sh -cp 1 -w 2
+./cluster.sh --control-plane --workers 2  # creates 1 control-plane and 2 workers
 ```
 
 If DHCP is “stuck”, release and renew so you can SSH in:
@@ -29,10 +29,10 @@ If DHCP is “stuck”, release and renew so you can SSH in:
 virsh net-dhcp-release default
 ```
 
-SSH to the control plane VM (replace the IP you see for `k8s-cp-1`):
+SSH to the control plane VM (replace the IP you see for `k8s-a`):
 
 ```bash
-ssh ubuntu@<k8s-cp-1-IP>
+ssh ubuntu@<k8s-a-IP>
 ```
 
 Password: `ubuntu`
