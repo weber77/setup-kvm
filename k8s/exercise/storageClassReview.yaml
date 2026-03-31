@@ -1,0 +1,5 @@
+apiversion: v1
+kind: PersistenVolumeClaim
+metadata:
+  name: mysql
+spec:
